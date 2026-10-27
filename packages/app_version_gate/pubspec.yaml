@@ -1,0 +1,29 @@
+name: app_version_gate
+description: >-
+  Force-update and update-available prompts for Flutter apps, driven by
+  per-platform build numbers. Fails open, rechecks on resume, and falls back
+  from Play in-app updates to the store link.
+version: 0.1.0
+homepage: https://github.com/BrianLandes/app-version-gate
+repository: https://github.com/BrianLandes/app-version-gate/tree/main/packages/app_version_gate
+issue_tracker: https://github.com/BrianLandes/app-version-gate/issues
+topics: [update, version, force-update, in-app-update, release]
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  in_app_update: ">=4.2.0 <6.0.0"
+  package_info_plus: ">=8.1.0 <11.0.0"
+  shared_preferences: ^2.3.0
+  url_launcher: ^6.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  fake_async: ^1.3.3

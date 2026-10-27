@@ -1,0 +1,103 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# GitHub-hosted on purpose: this repo is public, and a public repo must never
+# run on a self-hosted runner (fork PRs would run arbitrary code on it).
+
+jobs:
+  action:
+    name: Action (tests, dist up to date)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: action
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: action/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      # Includes the guard tests: exactly one Play commit call, always with
+      # changesInReviewBehavior=ERROR_IF_IN_REVIEW.
+      - run: npm test
+      # A JavaScript action runs its committed dist/, not src/. A stale bundle
+      # would ship code the tests never saw.
+      - run: npm run check-dist
+
+  flutter:
+    name: Flutter packages (${{ matrix.deps }} deps)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Lowest catches a lower bound that no longer compiles, which users
+        # pinned to older versions would hit first.
+        deps: [highest, lowest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: app_version_gate
+        working-directory: packages/app_version_gate
+        run: |
+          if [ "${{ matrix.deps }}" = lowest ]; then flutter pub downgrade; else flutter pub get; fi
+          dart format --output=none --set-exit-if-changed lib test
+          flutter analyze
+          flutter test
+      - name: app_version_gate_supabase
+        working-directory: packages/app_version_gate_supabase
+        run: |
+          if [ "${{ matrix.deps }}" = lowest ]; then flutter pub downgrade; else flutter pub get; fi
+          flutter analyze
+          flutter test
+      - name: example
+        working-directory: packages/app_version_gate/example
+        run: flutter pub get && flutter analyze
+      - name: Publish dry run
+        if: matrix.deps == 'highest'
+        working-directory: packages/app_version_gate
+        run: flutter pub publish --dry-run
+
+  migration:
+    name: Migration applies on a Supabase-shaped Postgres
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply with Supabase's roles and default grants, then check access
+        run: |
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          GRANT USAGE ON SCHEMA public TO anon, authenticated;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+          SQL
+          psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f supabase/migrations/*_app_release_requirements.sql
+          test "$(psql -h 127.0.0.1 -U postgres -tAc "set role anon; select count(*) from app_release_requirements")" = 2
+          if psql -h 127.0.0.1 -U postgres -c "set role anon; update app_release_requirements set latest_build = 1" 2>/dev/null; then
+            echo "::error::anon could write app_release_requirements"; exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Security posture
+        run: |
+          printf 'tables:\n  app_release_requirements: { kind: public-read, reason: the gate runs before sign-in }\n' > posture.yaml
+          npx -y supabase-security-posture@0.1.0 check --config posture.yaml \
+            --db-url postgresql://postgres:postgres@127.0.0.1:5432/postgres

@@ -1,0 +1,25 @@
+name: app_version_gate_supabase
+description: >-
+  Supabase source for app_version_gate: reads per-platform release
+  requirements from an app_release_requirements table.
+version: 0.1.0
+homepage: https://github.com/BrianLandes/app-version-gate
+repository: https://github.com/BrianLandes/app-version-gate/tree/main/packages/app_version_gate_supabase
+issue_tracker: https://github.com/BrianLandes/app-version-gate/issues
+topics: [supabase, update, version, force-update]
+
+environment:
+  sdk: ^3.6.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  app_version_gate: ^0.1.0
+  supabase: ^2.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  http: ^1.2.0

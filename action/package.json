@@ -1,0 +1,27 @@
+{
+  "name": "app-version-gate-action",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GitHub Action that stages uploaded app builds and promotes them into an in-app update gate once the store really serves them.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check-dist": "node scripts/check-dist.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "all": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@actions/core": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

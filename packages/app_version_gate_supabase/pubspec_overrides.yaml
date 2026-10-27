@@ -1,0 +1,4 @@
+# Develop against the sibling package; consumers get it from pub.dev.
+dependency_overrides:
+  app_version_gate:
+    path: ../app_version_gate

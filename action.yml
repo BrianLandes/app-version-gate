@@ -1,0 +1,129 @@
+name: App Version Gate
+description: >-
+  Stage each uploaded app build, then raise your in-app "update available" gate
+  only once Google Play or TestFlight really serves that build.
+author: Brian Landes
+branding:
+  icon: shield
+  color: orange
+
+inputs:
+  mode:
+    description: >-
+      `stage` records a just-uploaded build number (run it in your build
+      workflow after the store upload). `promote` checks each staged build
+      against its store and raises `latest_build` once it is live (run it on a
+      schedule). See action/README.md.
+    required: true
+
+  # ----- Both modes -----
+  supabase-url:
+    description: Your Supabase project URL, e.g. `https://<ref>.supabase.co`.
+    required: true
+  supabase-secret-key:
+    description: >-
+      A Supabase secret API key (`sb_secret_…`) or legacy service-role JWT. The
+      release table must not be writable by clients, so both modes need
+      elevated access.
+    required: true
+  table:
+    description: >-
+      The release-requirements table, one row per platform (`android`, `ios`)
+      with integer `pending_build` and `latest_build` columns and an
+      `updated_at` timestamp.
+    required: false
+    default: app_release_requirements
+
+  # ----- mode: stage -----
+  platform:
+    description: "stage: `android` or `ios`."
+    required: false
+  build:
+    description: "stage: the build number just uploaded (a positive integer, e.g. the versionCode / CFBundleVersion)."
+    required: false
+  column:
+    description: >-
+      stage: the column to raise. `pending_build` (default) stages the build
+      for `promote`. `latest_build` skips the store check; use it only for an
+      emergency bump. Either way the value is only ever raised.
+    required: false
+    default: pending_build
+
+  # ----- mode: promote, Android -----
+  android-package:
+    description: "promote: the Android application ID. Android is skipped (with an annotation if a build is staged) when this or the service account is empty."
+    required: false
+  play-service-account-json:
+    description: >-
+      promote: JSON key of a Google service account with Play Console access to
+      the app (View app information, Release to production). The same account
+      your upload step uses works.
+    required: false
+  play-track:
+    description: >-
+      promote: the Play track your upload step releases to, i.e. the one users
+      install from. Must match the upload step's track.
+    required: false
+    default: production
+  play-upload-workflow:
+    description: >-
+      promote: the FILE name of the workflow that uploads to Play (e.g.
+      `build.yml`). Its `run_number` must be the versionCode. Play is never
+      touched while a run of it is queued, waiting or in progress.
+    required: false
+    default: build.yml
+  play-min-age-hours:
+    description: "promote: hours after the staging run finished before the first review probe."
+    required: false
+    default: "2"
+  play-review-probe:
+    description: >-
+      promote: `on` or `off`. `off` is the Android kill switch: Play is never
+      touched, staged Android builds are never auto-promoted, and each run
+      annotates instead so you can promote by hand.
+    required: false
+    default: "on"
+
+  # ----- mode: promote, iOS -----
+  ios-bundle-id:
+    description: "promote: the iOS bundle ID. iOS is skipped (with an annotation if a build is staged) when this or any App Store Connect credential is empty."
+    required: false
+  appstore-key-id:
+    description: "promote: App Store Connect API key ID."
+    required: false
+  appstore-issuer-id:
+    description: "promote: App Store Connect API issuer ID."
+    required: false
+  appstore-private-key:
+    description: >-
+      promote: the App Store Connect API private key (.p8), either as the raw
+      PEM text or base64-encoded. Detected automatically.
+    required: false
+  testflight-external:
+    description: >-
+      promote: `true` if the build goes to external TestFlight testers, so
+      promotion also waits for Beta App Review, not just processing.
+    required: false
+    default: "false"
+
+  # ----- mode: promote, general -----
+  dry-run:
+    description: >-
+      promote: `true` checks everything but skips the Play review-probe commit
+      and every `latest_build` write.
+    required: false
+    default: "false"
+  github-token:
+    description: >-
+      promote: token used to list the upload workflow's runs. Needs
+      `actions: read`.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  promoted:
+    description: "promote: comma-separated platforms whose `latest_build` was raised this run (e.g. `android,ios`), or empty."
+
+runs:
+  using: node24
+  main: action/dist/index.js
