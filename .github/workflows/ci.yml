@@ -63,7 +63,14 @@ jobs:
       - name: Publish dry run
         if: matrix.deps == 'highest'
         working-directory: packages/app_version_gate
-        run: flutter pub publish --dry-run
+        # The dry run refuses a dirty checkout. Tooling on the runner has
+        # rewritten a generated file before; show what changed, then publish
+        # from the committed state the way a real release would.
+        run: |
+          git diff --stat
+          git diff
+          git checkout -- .
+          flutter pub publish --dry-run
 
   migration:
     name: Migration applies on a Supabase-shaped Postgres
@@ -89,8 +96,11 @@ jobs:
           ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
           SQL
           psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -f supabase/migrations/*_app_release_requirements.sql
-          test "$(psql -h 127.0.0.1 -U postgres -tAc "set role anon; select count(*) from app_release_requirements")" = 2
-          if psql -h 127.0.0.1 -U postgres -c "set role anon; update app_release_requirements set latest_build = 1" 2>/dev/null; then
+          # One statement per -c: with both in one string, newer psql prints
+          # the SET tag too.
+          count=$(psql -h 127.0.0.1 -U postgres -tA -c "set role anon" -c "select count(*) from app_release_requirements" | tail -n1)
+          test "$count" = 2 || { echo "::error::anon read $count rows, expected 2"; exit 1; }
+          if psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 -c "set role anon" -c "update app_release_requirements set latest_build = 1" 2>/dev/null; then
             echo "::error::anon could write app_release_requirements"; exit 1
           fi
       - uses: actions/setup-node@v4

@@ -1,6 +1,6 @@
 # App Version Gate (GitHub Action)
 
-`uses: BrianLandes/app-version-gate@v1`
+`uses: BrianLandes/app-version-gate@v0`
 
 Your app shows an "update available" prompt when its build number is below
 `latest_build` in a Supabase table. This action keeps that number honest: it
@@ -85,7 +85,7 @@ build and to age it (see [Assumptions](#assumptions)).
           status: completed
 
       - name: Stage the build for the update gate
-        uses: BrianLandes/app-version-gate@v1
+        uses: BrianLandes/app-version-gate@v0
         with:
           mode: stage
           platform: android
@@ -99,7 +99,7 @@ looks the build up by that number and doesn't depend on run numbers.
 
 ```yaml
       - name: Stage the build for the update gate
-        uses: BrianLandes/app-version-gate@v1
+        uses: BrianLandes/app-version-gate@v0
         with:
           mode: stage
           platform: ios
@@ -143,7 +143,7 @@ jobs:
       actions: read
       contents: read
     steps:
-      - uses: BrianLandes/app-version-gate@v1
+      - uses: BrianLandes/app-version-gate@v0
         id: gate
         with:
           mode: promote
@@ -178,7 +178,7 @@ nothing is staged for it, and an error annotation once a build is staged and
 can't be checked.
 
 Because the promote step makes real writes to your production Play app, pin it
-to a full commit SHA rather than `@v1` if you want to review every change to the
+to a full commit SHA rather than `@v0` if you want to review every change to the
 probe before it runs.
 
 ## Inputs
